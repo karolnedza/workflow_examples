@@ -19,3 +19,10 @@ Testing for AWS us-east-1:
 - Create an Aviatrix transit gw in us-east-1 with the name "aws-use1-transit-gw".
 - Enable segmentation at MULTI-CLOUD TRANSIT > Segmentation > 1
 - Create a domain name "red" at MULTI-CLOUD Transit > Segmentation > 2
+
+S3:
+
+terraform init \
+    -backend-config="key=deploy_avx_spoke_gw_12345668999.tfstate" \
+    -backend-config="region=us-east-1" \
+    -backend-config="bucket=solution-terraform-state-205987878622"
