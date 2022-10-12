@@ -1,6 +1,6 @@
-variable "name" {}
+variable "vpc_name" {}
 
-variable "cidr" {}
+variable "vpc_cidr" {}
 
 variable "cloud" {
   type        = map(string)
