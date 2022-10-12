@@ -1,7 +1,6 @@
 module "mc-spoke" {
   source  = "../modules/mc-spoke/aviatrix"
   name = var.vpc_name
-  version = "1.3.0"
   cloud = var.cloud[var.region]
   region = var.region
   account = var.account_name[var.region]
