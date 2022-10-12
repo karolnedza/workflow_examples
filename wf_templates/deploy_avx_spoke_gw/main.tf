@@ -1,5 +1,5 @@
 module "mc-spoke" {
-  source  = "../modules/mc-spoke/aviatrix"
+  source  = "../modules/mc-spoke"
   name = var.vpc_name
   cloud = var.cloud[var.region]
   region = var.region
