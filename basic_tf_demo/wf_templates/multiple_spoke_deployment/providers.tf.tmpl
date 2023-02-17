@@ -1,0 +1,14 @@
+provider "aviatrix" {
+  # username = "admin"
+  controller_ip = "{{ ctrl_ip }}"
+  # password = var.ctrl_password
+}
+
+terraform {
+    required_providers {
+      aviatrix = {
+            source  = "aviatrixsystems/aviatrix"
+            version = "=3.0.0"
+        }
+    }
+}

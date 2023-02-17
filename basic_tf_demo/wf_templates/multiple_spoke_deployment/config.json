@@ -1,0 +1,11 @@
+{
+    "cloud": "aws",
+    "account_name": "aws-account",
+    "transit_gw_name": "aws-use1-transit-gw",
+    "vpc_id": "use1-10-10-0-0-16",
+    "vpc_name": "use1-10-10-0-0-16",
+    "cidr": "10.10.0.0/16",
+    "region": "us-east-1",
+    "network_domain": "red",
+    "ctrl_ip": "52.3.72.231"
+}

@@ -1,0 +1,15 @@
+module "{{ vpc_id }}" {
+  source  = "../modules/mc-spoke"
+  name = "{{ vpc_name }}"
+  cloud = "{{ cloud }}"
+  region = "{{ region }}"
+  account = "{{ account_name }}"
+  cidr = "{{ cidr }}"
+  transit_gw = "{{ transit_gw_name }}"
+  network_domain = "{{ network_domain }}"
+  ha_gw = false
+}
+
+output "{{ vpc_id }}" {
+  value = module.{{ vpc_id }}.vpc
+}
