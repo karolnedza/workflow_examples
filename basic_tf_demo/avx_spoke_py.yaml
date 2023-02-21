@@ -69,7 +69,7 @@ tasks:
     options:
       workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
       cmd:
-        jinja -d config.json providers.tf.tmpl > providers.tf
+        jinja -d config.json providers.tf.tmpl > providers.tf;
         jinja -d config.json main.tf.tmpl > ${{ input.cloud }}-${{ input.vpc_id }}.tf
 
   create_branch:
@@ -90,8 +90,7 @@ tasks:
       vpc-id: ${{ input.vpc_id }}
       cidr: ${{ input.cidr }}
       network_domain: ${{ input.network_domain }}
-      region: ${{ input.region }}
-      "
+      region: ${{ input.region }}";
         git push -u origin avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
 
   create_pr:
