@@ -1,0 +1,106 @@
+
+id: avx_spoke_pull_request
+name: Aviatrix Spoke GW Pull Request
+
+inputs:
+  cloud: str
+  account_name: str
+  transit_gw_name: str
+  vpc_id: str
+  vpc_name: str
+  cidr: str
+  network_domain: str
+  region: str
+
+secrets:
+  repo_url: WORKFLOW_REPOSITORY
+  aws_access_key_id: AWS_ACCESS_KEY_ID
+  aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+  aviatrix_username: AVIATRIX_USERNAME
+  aviatrix_password: AVIATRIX_PASSWORD
+  s3_bucket: S3_BUCKET
+  ctrl_ip: AVIATRIX_CONTROLLER_IP
+
+tasks:
+
+  git_clone:
+    name: Git Clone
+    description: Clone a terraform repo
+    action: bash
+    options:
+      cmd:
+        git clone ${{ input.repo_url }} terraform_repo;
+        realpath terraform_repo
+
+  generate_config:
+    name: Generate Config
+    description: Generate config file in the given folder
+    action: bash
+    depends: [git_clone]
+    options:
+      workdir: ${{ task.git_clone.output.repo_dir }}/basic_tf_demo/scripts
+      env:
+        AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
+        AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
+        AVIATRIX_CONTROLLER_IP: ${{ secret.ctrl_ip }}
+      cmd:
+        python gen_multi_spoke_deploy_config.py
+          --workdir ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+         --cloud ${{ input.cloud }}
+         --account-name ${{ input.account_name }}
+         --vpc-name ${{ input.vpc_name }}
+         --vpc-id ${{ input.vpc_id }}
+         --cidr ${{ input.cidr }}
+         --network_domain ${{ input.network_domain }}
+         --region ${{ input.region }}
+
+  install_jinja:
+    name: Install Jinja2
+    action: bash
+    depends: [git_clone]
+    options:
+      cmd: pip install jinja-cli
+
+  generate_tf:
+    name: Generate TF Module
+    action: bash
+    depends: [generate_config, install_jinja]
+    options:
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        jinja -d config.json providers.tf.tmpl > providers.tf
+        jinja -d config.json main.tf.tmpl > ${{ input.cloud }}-${{ input.vpc_id }}.tf
+
+  create_branch:
+    name: Create Branch and Commit
+    action: bash
+    depends: [generate_tf]
+    options:
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        git checkout -b avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
+        git add providers.tf;
+        git add ${{ input.cloud }}-${{ input.vpc_id }}.tf;
+        git commit -m "Spoke Deployment Request
+
+      cloud: ${{ input.cloud }}
+      account-name: ${{ input.account_name }}
+      vpc-name: ${{ input.vpc_name }}
+      vpc-id: ${{ input.vpc_id }}
+      cidr: ${{ input.cidr }}
+      network_domain: ${{ input.network_domain }}
+      region: ${{ input.region }}
+      "
+        git push -u origin avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
+
+  create_pr:
+    name: Create Pull Request
+    action: bash
+    depends: [create_branch]
+    options:
+      workdir: ${{ task.git_clone.output.repo_dir }}/basic_tf_demo/scripts
+      env:
+        GITHUB_API_TOKEN: ${{ secret.GITHUB_API_TOKEN }}
+      cmd:
+        python create_pr.py
+          --head-branch avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
