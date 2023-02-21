@@ -20,6 +20,7 @@ secrets:
   aviatrix_password: AVIATRIX_PASSWORD
   s3_bucket: S3_BUCKET
   ctrl_ip: AVIATRIX_CONTROLLER_IP
+  gh_api_token: GITHUB_API_TOKEN
 
 tasks:
 
@@ -100,7 +101,7 @@ tasks:
     options:
       workdir: ${{ task.git_clone.output.repo_dir }}/basic_tf_demo/scripts
       env:
-        GITHUB_API_TOKEN: ${{ secret.GITHUB_API_TOKEN }}
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
       cmd:
         python create_pr.py
           --head-branch avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
