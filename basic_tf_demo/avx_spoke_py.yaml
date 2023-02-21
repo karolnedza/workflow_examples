@@ -29,7 +29,7 @@ tasks:
     action: bash
     options:
       cmd:
-        git clone ${{ input.repo_url }} terraform_repo;
+        git clone ${{ secret.repo_url }} terraform_repo;
         realpath terraform_repo
 
   generate_config:
