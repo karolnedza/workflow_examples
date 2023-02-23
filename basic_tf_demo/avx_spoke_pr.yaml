@@ -1,4 +1,3 @@
-
 id: avx_spoke_pull_request
 name: Aviatrix Spoke GW Pull Request
 
@@ -37,9 +36,9 @@ tasks:
     name: Generate Config
     description: Generate config file in the given folder
     action: bash
-    depends: [git_clone]
+    dependencies: [git_clone]
     options:
-      workdir: ${{ task.git_clone.output.repo_dir }}/basic_tf_demo/scripts
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/scripts
       env:
         AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
         AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
@@ -58,14 +57,14 @@ tasks:
   install_jinja:
     name: Install Jinja2
     action: bash
-    depends: [git_clone]
+    dependencies: [git_clone]
     options:
       cmd: pip install jinja-cli
 
   generate_tf:
     name: Generate TF Module
     action: bash
-    depends: [generate_config, install_jinja]
+    dependencies: [generate_config, install_jinja]
     options:
       workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
       cmd:
@@ -75,30 +74,22 @@ tasks:
   create_branch:
     name: Create Branch and Commit
     action: bash
-    depends: [generate_tf]
+    dependencies: [generate_tf]
     options:
       workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
-      cmd:
-        git checkout -b avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
+      cmd: |
+        git checkout -b avx-wf/${{ input.cloud }}-${{ input.vpc_id }};
         git add providers.tf;
         git add ${{ input.cloud }}-${{ input.vpc_id }}.tf;
-        git commit -m "Spoke Deployment Request
-
-      cloud: ${{ input.cloud }}
-      account-name: ${{ input.account_name }}
-      vpc-name: ${{ input.vpc_name }}
-      vpc-id: ${{ input.vpc_id }}
-      cidr: ${{ input.cidr }}
-      network_domain: ${{ input.network_domain }}
-      region: ${{ input.region }}";
+        git commit -m "Spoke Deployment Request" -m "cloud: ${{ input.cloud }}" -m "account-name: ${{ input.account_name }}" -m "vpc-name: ${{ input.vpc_name }}" -m "vpc-id: ${{ input.vpc_id }}" -m "cidr: ${{ input.cidr }}" -m "network_domain: ${{ input.network_domain }}" -m "region: ${{ input.region }}"
         git push -u origin avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
 
   create_pr:
     name: Create Pull Request
     action: bash
-    depends: [create_branch]
+    dependencies: [create_branch]
     options:
-      workdir: ${{ task.git_clone.output.repo_dir }}/basic_tf_demo/scripts
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/scripts
       env:
         GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
       cmd:
