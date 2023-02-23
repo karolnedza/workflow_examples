@@ -37,12 +37,35 @@ def get_pr_info():
     return parser.parse_args()
 
 def get_repo_info():
-    """Get the repository information."""
-    repo_name = subprocess.check_output(
+    """Get the repository information.
+
+    Uses git config to get the remote URL and parses it to get the repository.
+    The URL can take a few different forms:
+
+        git@github.com:<repo_owner>/<repo_name>.git
+        https://github.com/<repo_owner>/<repo_name>.git
+        https://x-access-token:<token>@github.com/<repo_owner>/<repo_name>.git
+
+    where we want to extract the string "<repo_owner>/<repo_name>".
+
+    Returns:
+        A string in the form <repo_owner>/<repo_name>
+    """
+    remote_url = subprocess.check_output(
         ['git', 'config', '--get', 'remote.origin.url']
     ).strip()
-    repo_name = repo_name.split(':')[1].split('.')[0]
-    return repo_name
+
+    if remote_url.startswith('git@'):
+        repo_info = remote_url.split(':')[-1].replace('.git', '')
+    elif remote_url.startswith('https://'):
+        repo_name = remote_url.split('/')[-1].replace('.git', '')
+        repo_owner = remote_url.split('/')[-2]
+        repo_info = f'{repo_owner}/{repo_name}'
+    else:
+        raise ValueError(f'Unknown remote URL: {remote_url}')
+
+    return repo_info
+
 
 #def create_pr(repo_name, base_branch, head_branch, title, body):
 def create_pr(repo_name, base_branch, head_branch):
@@ -58,6 +81,7 @@ def create_pr(repo_name, base_branch, head_branch):
         url, json=data, headers=GITHUB_API_HEADERS, auth=(GITHUB_API_TOKEN, '')
     )
     return response
+
 
 def main():
     """Run the script."""
