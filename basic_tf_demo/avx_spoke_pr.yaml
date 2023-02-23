@@ -77,11 +77,11 @@ tasks:
     dependencies: [generate_tf]
     options:
       workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
-      cmd: |
+      cmd:
         git checkout -b avx-wf/${{ input.cloud }}-${{ input.vpc_id }};
         git add providers.tf;
         git add ${{ input.cloud }}-${{ input.vpc_id }}.tf;
-        git commit -m "Spoke Deployment Request" -m "cloud: ${{ input.cloud }}" -m "account-name: ${{ input.account_name }}" -m "vpc-name: ${{ input.vpc_name }}" -m "vpc-id: ${{ input.vpc_id }}" -m "cidr: ${{ input.cidr }}" -m "network_domain: ${{ input.network_domain }}" -m "region: ${{ input.region }}"
+        git commit -F "commit_msg.txt";
         git push -u origin avx-wf/${{ input.cloud }}-${{ input.vpc_id }}
 
   create_pr:
