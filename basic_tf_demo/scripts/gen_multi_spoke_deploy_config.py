@@ -40,9 +40,11 @@ def main():
     assert check_account_exists(args.account_name, ctrl_api, cid)
 
     # Check if network domain exists
-    if not check_network_domain_exists(args.network_domain, ctrl_api, cid):
+    network_domains = get_network_domain(ctrl_api, cid)
+    if not args.network_domain in [domain["name"] for domain in network_domains]:
         # Check destination CIDRs are valid and connected.
-        pass
+        get_connected_domains(cidr, ctrl_api, cid)
+
 
     # Generate spoke gateway config file.
     config = {
@@ -131,18 +133,49 @@ def check_account_exists(account_name, controller_api_url, cid):
     return account_name in account_list
 
 
-def check_network_domain_exists(network_domain, controller_api_url, cid):
+def get_network_domain(controller_api_url, cid):
     """Check if network domain exists on AVX controller"""
     log.info("Getting list of network domains on controller.")
     response = requests.post(
         controller_api_url,
-        data={"action": "list_network_domains", "CID": cid},
+        data={"action": "list_multi_cloud_security_domains", "CID": cid},
         verify=False,
     )
-    log.debug("list_network_domains response:\n%s", pformat(response.json()))
-    network_domain_list = response.json()["results"]["network_domain_list"]
+    log.debug("list_multi_cloud_security_domains response:\n%s", pformat(response.json()))
+    network_domain_list = response.json()["results"]["domains"]
     log.debug("Network Domain List:\n%s", pformat(network_domain_list))
-    return network_domain in network_domain_list
+    return network_domain_list
+
+
+def get_connected_domains(cidr, controller_api_url, cid):
+    """Check if CIDR is contained in Connected Network Domains"""
+    # Get Network Domains
+    network_domains = get_network_domain(controller_api_url, cid)
+    domain_names = [domain["name"] for domain in network_domains]
+
+    connected_domains = []
+
+    for domain_name in domain_names:
+        log.info("Getting list of connected CIDRs on controller.")
+        response = requests.post(
+            controller_api_url,
+            data={
+                "action": "get_multi_cloud_security_domain_details",
+                "CID": cid,
+                "domain_name": domain_name
+            },
+            verify=False,
+        )
+        log.debug("get_multi_cloud_security_domain_details response:\n%s", pformat(response.json()))
+        connected_cidrs = response.json()["results"]["connected_domain_cidr"]
+        log.debug("Connected CIDRs:\n%s", pformat(connected_cidrs))
+
+        # Collect network if CIDR is contained in Network Domain
+        for connected_cidr in connected_cidrs:
+            if ipaddress.ip_network(cidr).subnet_of(ipaddress.ip_network(connected_cidr)):
+                connected_domains.append(domain_name)
+
+    return connected_domains
 
 
 if __name__ == "__main__":
