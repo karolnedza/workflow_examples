@@ -74,7 +74,7 @@ def create_pr(repo_name, base_branch, head_branch):
     data = {
         'base': base_branch,
         'head': head_branch,
-        #'title': title,
+        'title': "Add spoke gateway",
         #'body': body
     }
     response = requests.post(
