@@ -53,7 +53,7 @@ def get_repo_info():
     """
     remote_url = subprocess.check_output(
         ['git', 'config', '--get', 'remote.origin.url']
-    ).strip()
+    ).decode('utf-8').strip()
 
     if remote_url.startswith('git@'):
         repo_info = remote_url.split(':')[-1].replace('.git', '')
