@@ -59,7 +59,7 @@ def main():
         "cidr": args.cidr,
         "region": args.region,
         "network_domain": args.network_domain,
-        "ctrl_ip": args.ctrl_ip,
+        "ctrl_ip": avx_ip,
     }
     log.debug("Spoke gateway config: %s", pformat(config))
 
