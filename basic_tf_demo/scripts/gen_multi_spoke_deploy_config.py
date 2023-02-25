@@ -125,6 +125,7 @@ def controller_login(ctrl_ip, username, password):
             f"\nController IP: {ctrl_ip}"
         ) from exc
 
+
 def check_account_exists(account_name, controller_api_url, cid):
     """Check if account exists AVX controller"""
     log.info("Getting list of accounts on controller.")
@@ -136,7 +137,9 @@ def check_account_exists(account_name, controller_api_url, cid):
     log.debug("list_accounts response:\n%s", pformat(response.json()))
     account_list = response.json()["results"]["account_list"]
     log.debug("Account List:\n%s", pformat(account_list))
-    return account_name in account_list
+    account_names = [account["account_name"] for account in account_list]
+    log.debug("Account Names:\n%s", pformat(account_names))
+    return account_name in account_names
 
 
 def get_network_domain(controller_api_url, cid):
