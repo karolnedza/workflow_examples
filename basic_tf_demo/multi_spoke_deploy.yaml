@@ -1,0 +1,76 @@
+id: multi_deploy_avx_spoke_gw
+name: Deploy AVX Spoke Gateway
+
+inputs:
+  region: str
+
+secrets:
+  repo_url: WORKFLOW_REPOSITORY
+  aws_access_key_id: AWS_ACCESS_KEY_ID
+  aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+  aviatrix_username: AVIATRIX_USERNAME
+  aviatrix_password: AVIATRIX_PASSWORD
+  s3_bucket: S3_BUCKET
+  ctrl_ip: AVIATRIX_CONTROLLER_IP
+  gh_api_token: GITHUB_API_TOKEN
+  git_email: GIT_USER_EMAIL
+  git_name: GIT_USER_NAME
+
+tasks:
+  git_clone:
+    name: Git Clone
+    description: Clone a terraform repo
+    action: bash
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+      cmd:
+        git clone ${{ secret.repo_url }} terraform_repo;
+        realpath terraform_repo
+
+  tf_install:
+    name: Install Terrraform
+    action: bash
+    dependencies: [git_clone]
+    options:
+      env:
+        TF_VERSION: 1.3.6
+        TF_INSTALL_ZIP: terraform_1.3.6_linux_amd64.zip
+      cmd:
+        wget -O terraform.zip
+          https://releases.hashicorp.com/terraform/${TF_VERSION}/${TF_INSTALL_ZIP};
+        python ${{ task.git_clone.output.result }}/basic_tf_demo/scripts/unzip.py terraform.zip;
+        chmod 777 terraform;
+        realpath terraform;
+
+  tf_init:
+    name: TF Init
+    description: Initialize terraform with S3 Bucket
+    action: bash
+    dependencies: [tf_install]
+    options:
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secret.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ secret.aws_secret_access_key }}
+        AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
+        AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        '${{ task.tf_install.output.result }} init
+          -backend-config="key=multi_deploy_avx_spoke_gw_09871234.tfstate"
+          -backend-config="region=${{ input.region }}"
+          -backend-config="bucket=${{ secret.s3_bucket }}"'
+
+  tf_apply:
+    name: TF Apply
+    action: bash
+    dependencies: [tf_install, tf_init]
+    options:
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secret.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ secret.aws_secret_access_key }}
+        AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
+        AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        ${{ task.tf_install.output.result }} apply --auto-approve
