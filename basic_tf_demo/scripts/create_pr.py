@@ -9,11 +9,11 @@ import requests
 
 
 GITHUB_API_URL = 'https://api.github.com'
+GITHUB_API_TOKEN = os.environ.get('GITHUB_API_TOKEN')
 GITHUB_API_HEADERS = {
     'Accept': 'application/vnd.github.v3+json',
+    'Authorization': f'Bearer {GITHUB_API_TOKEN}'
 }
-GITHUB_API_TOKEN = os.environ.get('GITHUB_API_TOKEN')
-
 
 def get_pr_info():
     """Get the pull request information from the user."""
@@ -78,7 +78,7 @@ def create_pr(repo_name, base_branch, head_branch):
         #'body': body
     }
     response = requests.post(
-        url, json=data, headers=GITHUB_API_HEADERS, auth=(GITHUB_API_TOKEN, '')
+        url, json=data, headers=GITHUB_API_HEADERS
     )
     return response
 
