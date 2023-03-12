@@ -1,0 +1,159 @@
+id: sn_merge_pr_and_build
+name: Merge pull request and build
+
+inputs:
+  merge_info: str
+  sn_callback_url: str
+  sn_sys_id: str
+
+secrets:
+  repo_url: WORKFLOW_REPOSITORY
+  aws_access_key_id: AWS_ACCESS_KEY_ID
+  aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+  aviatrix_username: AVIATRIX_USERNAME
+  aviatrix_password: AVIATRIX_PASSWORD
+  s3_bucket: S3_BUCKET
+  s3_region: S3_REGION
+  ctrl_ip: AVIATRIX_CONTROLLER_IP
+  gh_api_token: GITHUB_API_TOKEN
+  git_email: GIT_USER_EMAIL
+  git_name: GIT_USER_NAME
+  sn_username: SERVICE_NOW_USERNAME
+  sn_password: SERVICE_NOW_PASSWORD
+
+tasks:
+  git_clone:
+    name: Git Clone
+    description: Clone a terraform repo
+    action: bash
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+      cmd:
+        git clone ${{ secret.repo_url }} terraform_repo;
+        realpath terraform_repo
+
+  merge_pr:
+    name: Merge Pull Request
+    description: Merge a given PR
+    action: bash
+    dependencies: [git_clone]
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+        SN_USERNAME: ${{ secret.sn_username }}
+        SN_PASSWORD: ${{ secret.sn_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/scripts
+      cmd:
+        python sn_merge_pr.py
+          --merge ${{ input.merge_info }}
+          --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+          --sn_user $SN_USERNAME 
+          --sn_password $SN_PASSWORD
+
+  git_pull:
+    name: Git pull to get the latest merge
+    description: Clone a terraform repo
+    action: bash
+    dependencies: [merge_pr]
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        git pull;
+
+  tf_install:
+    name: Install Terrraform
+    action: bash
+    dependencies: [git_pull]
+    options:
+      env:
+        TF_VERSION: 1.3.6
+        TF_INSTALL_ZIP: terraform_1.3.6_linux_amd64.zip
+      cmd:
+        wget -O terraform.zip
+          https://releases.hashicorp.com/terraform/${TF_VERSION}/${TF_INSTALL_ZIP};
+        python ${{ task.git_clone.output.result }}/basic_tf_demo/scripts/unzip.py terraform.zip;
+        chmod 777 terraform;
+        realpath terraform;
+
+  tf_init:
+    name: TF Init
+    description: Initialize terraform with S3 Bucket
+    action: bash
+    dependencies: [tf_install]
+    options:
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secret.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ secret.aws_secret_access_key }}
+        AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
+        AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        '${{ task.tf_install.output.result }} init
+          -backend-config="key=multi_deploy_avx_spoke_gw_09871234.tfstate"
+          -backend-config="region=${{ secret.s3_region }}"
+          -backend-config="bucket=${{ secret.s3_bucket }}"'
+
+  tf_apply:
+    name: TF Apply
+    action: bash
+    dependencies: [tf_install, tf_init]
+    options:
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secret.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ secret.aws_secret_access_key }}
+        AVIATRIX_USERNAME: ${{ secret.aviatrix_username }}
+        AVIATRIX_PASSWORD: ${{ secret.aviatrix_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        ${{ task.tf_install.output.result }} apply -no-color --auto-approve 2>&1 | tee apply-output.txt;
+        grep -i Error apply-output.txt > terraform.error;
+        echo $?
+
+  update_snow:
+    name: Update snow with apply result
+    action: bash
+    dependencies: [tf_apply]
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+        SN_USERNAME: ${{ secret.sn_username }}
+        SN_PASSWORD: ${{ secret.sn_password }}
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/scripts
+      cmd:
+        if [ ${{ task.tf_apply.output.result }} -ne 0 ]; then 
+          python sn_callback.py
+            --text "Terraform completed successfully"
+            --field "comments"
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+          python sn_callback.py
+            --text "Closed Complete"
+            --field "state"
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+        else
+          python sn_callback.py
+            --text "Terraform apply failed"
+            --field "comments"
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+          python sn_callback.py
+            --file ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment/terraform.error
+            --field "comments"
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+          python sn_callback.py
+            --text "Closed Incomplete"
+            --field "state"
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+        fi
+
