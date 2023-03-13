@@ -1,0 +1,93 @@
+id: sn_spoke_removal_pr
+name: create VPC and spoke GW removal pull request
+
+inputs:
+  cloud: str
+  vpc_id: str
+  delete_all: str
+  sn_callback_url: str
+  sn_sys_id: str
+
+secrets:
+  repo_url: WORKFLOW_REPOSITORY
+  gh_api_token: GITHUB_API_TOKEN
+  git_email: GIT_USER_EMAIL
+  git_name: GIT_USER_NAME
+  sn_username: SERVICE_NOW_USERNAME
+  sn_password: SERVICE_NOW_PASSWORD
+
+tasks:
+
+  git_clone:
+    name: Git Clone
+    description: Clone a terraform repo
+    action: bash
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+      cmd:
+        git clone ${{ secret.repo_url }} terraform_repo;
+        realpath terraform_repo
+
+  setup_git_cred:
+    name: Setup Git Credentials
+    action: bash
+    dependencies: [git_clone]
+    options:
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+      workdir: ${{ task.git_clone.output.result }}
+      cmd:
+        git config --local user.email "${{ secret.git_email }}";
+        git config --local user.name "${{ secret.git_name }}"
+
+  create_branch:
+    name: Create Branch and Commit
+    action: bash
+    dependencies: [setup_git_cred]
+    options:
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/wf_templates/multiple_spoke_deployment
+      cmd:
+        if [ "${{ input.delete_all }}" = "true" ]; then
+          git checkout -b avx-wf/${{ input.cloud }}-destroy-all-vpcs;
+          git rm ${{ input.cloud }}-*.tf;
+          git commit -m "destroy all vpcs";
+          git push -u origin avx-wf/${{ input.cloud }}-destroy-all-vpcs;
+        else
+          git checkout -b avx-wf/${{ input.cloud }}-${{ input.vpc_id }};
+          git rm ${{ input.cloud }}-${{ input.vpc_id }}.tf;
+          git commit -m "destroy ${{ input.vpc_id }}";
+          git push -u origin avx-wf/${{ input.cloud }}-${{ input.vpc_id }};
+        fi
+
+  create_pr:
+    name: Create Pull Request
+    action: bash
+    dependencies: [create_branch]
+    options:
+      workdir: ${{ task.git_clone.output.result }}/basic_tf_demo/scripts
+      env:
+        GITHUB_API_TOKEN: ${{ secret.gh_api_token }}
+        SN_USERNAME: ${{ secret.sn_username }}
+        SN_PASSWORD: ${{ secret.sn_password }}
+      cmd:
+        if [ "${{ input.delete_all }}" = "true" ]; then
+          python sn_create_pr.py
+            --head-branch avx-wf/${{ input.cloud }}-destroy-all-vpcs 
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+        else
+          python sn_create_pr.py
+            --head-branch avx-wf/${{ input.cloud }}-${{ input.vpc_id }} 
+            --sn_url "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+            --sn_user $SN_USERNAME 
+            --sn_password $SN_PASSWORD;
+        fi
+        # echo $pr;
+        # curl -v -k "${{ input.sn_callback_url }}/${{ input.sn_sys_id }}" 
+        #   --request PATCH 
+        #   --header "Accept:application/json" 
+        #   --header "Content-Type:application/json" 
+        #   --data '{"state":"Pending", "correlation_id":"22"}'
+        #   --user $SN_USERNAME:$SN_PASSWORD

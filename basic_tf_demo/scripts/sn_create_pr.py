@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import requests
+from requests.auth import HTTPBasicAuth
 
 
 GITHUB_API_URL = 'https://api.github.com'
@@ -15,7 +16,7 @@ GITHUB_API_HEADERS = {
     'Authorization': f'Bearer {GITHUB_API_TOKEN}'
 }
 
-def get_pr_info():
+def get_input_args():
     """Get the pull request information from the user."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -31,6 +32,18 @@ def get_pr_info():
         '--b',
         help='The branch into which you want the pull request merged.',
         default="main"
+    )
+    parser.add_argument(
+        '--sn_url',
+        help='SNOW callback URL'
+    )
+    parser.add_argument(
+        '--sn_user',
+        help='SNOW user name'
+    )
+    parser.add_argument(
+        '--sn_password',
+        help='SNOW password'
     )
     #parser.add_argument('title', help='The title of the pull request')
     #parser.add_argument('body', help='The body of the pull request')
@@ -82,16 +95,38 @@ def create_pr(repo_name, base_branch, head_branch):
     )
     return response
 
+def sn_callback(url, user, password, merge_info):
+    """ Invoke sn callback """
+
+    headers = {
+        "Accept":"application/json",
+        "Content-Type":"application/json"
+    }
+    data = {
+        'state': "Pending",
+        'correlation_id': f'{merge_info}',
+        'comments': f'pull request: {merge_info}'
+    }
+    response = requests.patch(
+        url, json=data, headers=headers, auth = HTTPBasicAuth(user, password)
+    )
+    if response.status_code != 200:
+        print(response.json())
+        sys.exit(1)
 
 def main():
     """Run the script."""
     repo_name = get_repo_info()
-    pr_info = get_pr_info()
-    #response = create_pr(repo_name, pr_info.base_branch, pr_info.head_branch, pr_info.title, pr_info.body)
-    response = create_pr(repo_name, pr_info.base_branch, pr_info.head_branch)
+    input_args = get_input_args()
+    #response = create_pr(repo_name, input_args.base_branch, input_args.head_branch, input_args.title, input_args.body)
+    response = create_pr(repo_name, input_args.base_branch, input_args.head_branch)
     if response.status_code != 201:
         print(response.json())
         sys.exit(1)
+    else:
+        pr_resp = response.json()
+        merge_info = f"{repo_name},{pr_resp['number']}"
+        sn_callback(input_args.sn_url, input_args.sn_user, input_args.sn_password, merge_info)
 
 if __name__ == '__main__':
     main()
